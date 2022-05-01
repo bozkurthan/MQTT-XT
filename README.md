@@ -4,4 +4,4 @@ E(XT)ended Protocol for both IoT and UAV Systems.
 X= Represents Copter
 T= Represents Fixed-wing
 
-![Capture-removebg-preview](https://user-images.githubusercontent.com/44507545/166163999-974df19e-f430-4ab6-81bb-f59f2b03c85c.png)
+![Capture](https://user-images.githubusercontent.com/44507545/166164004-e4e72b94-3959-47c3-8fdc-84dd3fb6bc67.PNG)
