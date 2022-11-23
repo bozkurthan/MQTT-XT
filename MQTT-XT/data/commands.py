@@ -12,4 +12,4 @@ class Connect:
 
     def connection_result(self,fog_name,result):
         reachable_drones=result
-        return reachable_drones
+        return reachable_dronesasd
