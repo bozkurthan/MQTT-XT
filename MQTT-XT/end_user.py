@@ -21,13 +21,13 @@ client_ID = "end_user"
 
 test_packet_length = 5
 
-broker_cloud_address = "127.0.0.1" # bu clientta etki etmıyor
+broker_cloud_address = "test.mosquitto.org" # bu clientta etki etmıyor
 broker_cloud_port = 1883
 
 #topics
 client_sub_topic_reachable = "fog1/reachable"
-client_sub_topic_drone1_state_topic = "fog1/drone1/state"
-client_sub_topic_drone2_state_topic = "fog1/drone2/state"
+client_sub_topic_drone1_state_topic = "fog1/drone1/state/#"
+client_sub_topic_drone2_state_topic = "fog1/drone2/state/#"
 client_sub_topic_qdos_topic = "fog1/QDoS"
 
 fog1_list=[]

@@ -1,17 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import os
-import shutil
-import time
+import threading
 
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
-
-import threading
-import time
-
-import psutil
-from numpy import long
 
 # model girdilerini almak için 2D bir dizi oluşturulsu- dolu değerleri bu diziliere alınıp modele verielcek
 
@@ -24,19 +16,23 @@ global sub_message
 client_ID = "activator_client"
 
 #adress definition
-broker_cloud_address = "127.0.0.1"
+broker_cloud_address = "test.mosquitto.org"
 broker_cloud_port = 1883
-broker_fog1_address = "test.mosquitto.org"
-broker_fog1_port = 1883
+broker_fog1_address = "192.168.1.41"
+broker_fog1_port = 1884
 
 
 
 #topics sub to fog broker
-client_sub_topic_drone1 = "drone1/state"
-client_sub_topic_drone2 = "drone2/state"
+client_sub_topic_drone1 = "drone1/state/#"
+client_sub_topic_drone2 = "drone2/state/#"
 
 #topics sub to cloud
-client_sub_topic_connection = "init/fog"
+client_sub_topic_connection = "init/fog1"
+
+#topics pub to cloud
+client_pub_topic_drone1_state="fog1/drone1/state"
+
 
 cloud_connect=True
 
@@ -48,8 +44,14 @@ def process_reachability(sub_message):
 
 
     if(sub_message=="connect"):
-        print("Sub message:", sub_message)
-
+        print("Connect_message_received:", sub_message)
+    elif(sub_message != ""):
+        if (sub_message[0] == "L"):
+            print("Published LOcation: "+ sub_message)
+            publish.single(client_pub_topic_drone1_state+"/location", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
+        if (sub_message[0] == "B"):
+            print("Published LOcation: " + sub_message)
+            publish.single(client_pub_topic_drone1_state+"/battery", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
 
         # These code snippet provides that it handles time by incoming messages and saves them to file.
     # After this operation, it prepares new message.
@@ -68,7 +70,7 @@ def callback_on_message_cloud(client, userdata, message):
     sub_message = str(message.payload.decode("utf-8"))
     process_reachability(sub_message)
 
-def client_pub (connection_type):
+def client_pub ():
     print("This client will be run for only publishing. \n ")
     #client = mqtt.Client(client_ID)  # create new instance
     global cloud_connect
@@ -78,13 +80,7 @@ def client_pub (connection_type):
     print(cloud_connect)
     publish_message=""
     while (cloud_connect==True):
-        if(connection_type=="connect"):
-            print("connnectttt")
-            publish_message = "connect"
-            publish.single(client_pub_topic_connection, publish_message, 2, False, broker_cloud_address,
-                           broker_cloud_port)
-        elif(connection_type=="disconnect"):
-            publish_message = "disconnect"
+        publish.single(client_pub_topic_connection, publish_message, 2, False, broker_cloud_address,broker_cloud_port)
 
 
         print("Publish:", publish_message)
@@ -113,8 +109,7 @@ def client_sub_pub(sub_type):
         print("connecting to Cloud")
 
         client.connect(broker_cloud_address)  # connect to broker
-        print("Topic: "+client_sub_topic_drone1)
-        client.subscribe(client_sub_topic_drone1)
+        client.subscribe(client_sub_topic_connection)
 
         while (1):
             client.loop_start()  # start the loop
