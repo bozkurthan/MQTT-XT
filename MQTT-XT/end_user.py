@@ -16,7 +16,7 @@ sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_r
 
 global sub_message
 
-# pragma CONFIG
+# region CONFIG
 client_ID = "end_user"
 
 test_packet_length = 5
