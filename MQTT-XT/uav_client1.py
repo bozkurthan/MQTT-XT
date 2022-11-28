@@ -136,7 +136,7 @@ if __name__ == '__main__':
 # pragma Vehicle attributes to receive
 # Get all vehicle attributes (state)
 
-# print(" Global Location: %s" % vehicle.location.global_frame)
+# print(" Global Location: %s" % vehicle.location.global_frame)s
 # print(" Battery: %s" % vehicle.battery)
 # print(" Mode: %s" % vehicle.mode.name)  # settable
 # print(" Groundspeed: %s" % vehicle.groundspeed)
