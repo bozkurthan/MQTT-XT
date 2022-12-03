@@ -10,6 +10,7 @@ import time
 
 # region UAV variables to connect
 connection_string = "127.0.0.1:14550"
+global vehicle
 #endregion
 
 # region MQTT connection Variables
@@ -52,9 +53,10 @@ def publish_to_fog(publish_topic,publish_message):
 
 def process(sub_message):
     print("Sub message:", sub_message)
-    if (sub_message[0] == "L"):
+    if (sub_message[0] == "takeoff"):
         print("helloWorld1: "+ sub_message)
         #publish.single(client_pub_topic_drone1_state+"/location", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
+        vehicle.simple_takeoff("20")
     if (sub_message[0] == "B"):
         print("helloWorld2: " + sub_message)
         #publish.single(client_pub_topic_drone1_state+"/battery", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
