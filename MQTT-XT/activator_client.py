@@ -26,44 +26,52 @@ fog_number="fog1"
 #topics pub to cloud
 
 #Connectivity
-client_pub_topic_drone1_reachability=fog_number+"/drone1/reachable"
-client_pub_topic_drone2_reachability=fog_number+"/drone2/reachable"
+cli_to_cloud_pub_top_d1_reach=fog_number+"/drone1/reachable"
+cli_to_cloud_pub_top_d2_reach=fog_number+"/drone2/reachable"
 
 #Drone states
-client_pub_topic_drone1_state=fog_number+"/drone1/state"
-client_pub_topic_drone2_state=fog_number+"/drone2/state"
-client_pub_topic_drone2_state=fog_number+"/qods/"
+cli_to_cloud_pub_top_d1_state=fog_number+"/drone1/state/#"
+cli_to_cloud_pub_top_d2_state=fog_number+"/drone2/state/#"
+cli_to_cloud_pub_top_qdos=fog_number+"/qods/"
 
 #Command Results
-client_pub_topic_drone1_command_result=fog_number+"/drone1/state"
-client_pub_topic_drone2_state=fog_number+"/drone2/state"
+cli_to_cloud_pub_top_d1_cmd_result=fog_number+"/drone1/commands_result"
+cli_to_cloud_pub_top_d2_cmd_result=fog_number+"/drone2/commands_result"
 
 
 #topics pub to own server
-client_pub_topic_drone1_commands="drone1/commands"
-client_pub_topic_drone2_state="/drone2/commands"
+cli_to_fog_pub_top_d1_cmd="drone1/commands"
+cli_to_fog_pub_top_d2_cmd="/drone2/commands"
 
 #endregion
 
 #region Topics to Subscribe
 
 #topics sub to fog broker
-client_sub_topic_drone1 = "drone1/state/#"
-client_sub_topic_drone2 = "drone2/state/#"
+cli_to_fog_sub_top_d1_state = "drone1/state/#"
+cli_to_fog_sub_top_d2_state = "drone2/state/#"
 
 #topics sub to cloud
 
 #Connectivity
-client_sub_topic_connection = "init/" + fog_number
+cli_to_cloud_sub_top_connect = "init/" + fog_number
 
-#Connectivity
-client_sub_topic_drone1_commands = fog_number + "drone1/commands"
-client_sub_topic_drone2_commands = fog_number + "drone2/commands"
-
-#endregion
+#Commands
+cli_to_cloud_sub_top_d1_cmd = fog_number + "drone1/commands"
+cli_to_cloud_sub_top_d2_cmd = fog_number + "drone2/commands"
 
 #endregion
 
+#endregion
+
+# region qdos parameters
+drone1_battery =0
+drone2_battery =0
+drone1_groundspeed = 0
+drone2_groundspeed = 0
+qdos_array = ["drone1", "drone2"]
+
+# endregion
 
 # region Function definitions
 
@@ -73,13 +81,42 @@ sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_r
 global sub_message
 
 cloud_connect=True
-
-
-
 exitFlag = 0
-def process_reachability(sub_message):
-    print("Sub message:", sub_message)
 
+
+def client_pub():
+    print("This client will be run for only publishing. \n ")
+    # client = mqtt.Client(client_ID)  # create new instance
+    global cloud_connect
+    global broker_cloud_address
+    global broker_cloud_port
+    global client_pub_topic_connection
+    print(cloud_connect)
+    publish_message = ""
+    while (cloud_connect == True):
+        publish.single(client_pub_topic_connection, publish_message, 2, False, broker_cloud_address,
+                       broker_cloud_port)
+
+        print("Publish:", publish_message)
+
+# publish message to fog function
+def publish_to_fog(publish_topic,publish_message):
+    #Announcement for function
+    #client = mqtt.Client(client_ID)  # create new instance
+    #print(publish_message)
+    publish.single(publish_topic, publish_message, 2, False, broker_fog_address, broker_fog_port)
+
+# publish message to cloud function
+def publish_to_cloud(publish_topic,publish_message):
+    #Announcement for function
+    #client = mqtt.Client(client_ID)  # create new instance
+    #print(publish_message)
+    publish.single(publish_topic, publish_message, 2, False, broker_cloud_address, broker_cloud_port)
+
+
+
+def process_sub_message_cloud(message,topic):
+    print("Cloud Topic:"+message,",Message:"+topic)
 
     if(sub_message=="connect"):
         print("Connect_message_received:", sub_message)
@@ -97,46 +134,98 @@ def process_reachability(sub_message):
 
     #publish.single(client_pub_topic_connection, "", 1, False, broker_cloud_address, broker_cloud_port)
 
+#calculate qdos based on battery and groundspeed
+def qdos_calculate():
+    global drone1_battery
+    global drone2_battery
+    global drone1_groundspeed
+    global drone2_groundspeed
+
+    if(drone1_battery>drone2_battery):
+        publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
+    elif(drone1_battery<drone2_battery):
+        publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone2,drone1")
+    elif(drone1_battery==drone2_battery):
+        if(drone1_groundspeed>drone2_groundspeed):
+            publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
+        else:
+            publish_to_cloud(cli_to_cloud_pub_top_qdos, "drone2,drone1")
+
+#process fog messages (this includes to publish state of drones, qdos values and drone reacheability
+def process_sub_message_fog(message,topic):
+    print("Fog Topic:"+message,",Message:"+topic)
+    global drone1_battery
+    global drone2_battery
+    global drone1_groundspeed
+    global drone2_groundspeed
+    global qdos_array
+
+    #only publish if cloud is connected
+    if(cloud_connect):
+
+        # region drone1 states
+        if(topic=="drone1/state/location" or topic=="drone1/state/mode" or topic=="drone1/state/heading" ):
+            publish_to_cloud(fog_number+"/"+topic,sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+        if(topic=="drone1/state/battery"):
+            publish_to_cloud(fog_number+"/"+topic,sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            drone1_battery=sub_message
+            qdos_calculate()
+        if (topic == "drone1/state/groundspeed"):
+            publish_to_cloud(fog_number + "/" + topic, sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            drone1_groundspeed = sub_message
+            qdos_calculate()
+
+        #endregion
+
+        #region drone2 states
+        if(topic=="drone2/state/location" or topic=="drone2/state/mode" or topic=="drone2/state/heading" ):
+            publish_to_cloud(fog_number+"/"+topic,sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+        if(topic=="drone2/state/battery"):
+            publish_to_cloud(fog_number+"/"+topic,sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            drone2_battery=sub_message
+            qdos_calculate()
+        if (topic == "drone2/state/groundspeed"):
+            publish_to_cloud(fog_number + "/" + topic, sub_message)
+            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            drone2_groundspeed = sub_message
+            qdos_calculate()
+        #endregion
+
+        #region command results
+        if (topic == "drone1/commands_result"):
+            publish_to_cloud(fog_number + "/" + topic, sub_message)
+        if (topic == "drone2/commands_result"):
+            publish_to_cloud(fog_number+"/"+topic,sub_message)
+        #endregion
+
+# message function that handle fog messages
 def callback_on_message_fog(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
+    topic = message.topic
+    process_sub_message_fog(sub_message,topic)
 
-
-    process_reachability(sub_message)
-
-
+# message function that handle cloud messages
 def callback_on_message_cloud(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
-    process_reachability(sub_message)
-
-def client_pub ():
-    print("This client will be run for only publishing. \n ")
-    #client = mqtt.Client(client_ID)  # create new instance
-    global cloud_connect
-    global broker_cloud_address
-    global broker_cloud_port
-    global client_pub_topic_connection
-    print(cloud_connect)
-    publish_message=""
-    while (cloud_connect==True):
-        publish.single(client_pub_topic_connection, publish_message, 2, False, broker_cloud_address,broker_cloud_port)
+    topic = message.topic
+    process_sub_message_fog(sub_message,topic)
 
 
-        print("Publish:", publish_message)
 
+#deprecated for a now
+def publish_to_fog_all():
+    print("pub")
 
-def publish_to_cloud(publish_topic,publish_message):
-    #Announcement for function
-    #client = mqtt.Client(client_ID)  # create new instance
-    #print(publish_message)
-    publish.single(publish_topic, publish_message, 2, False, broker_cloud_address, broker_cloud_port)
-
-def publish_to_fog(publish_topic,publish_message):
-    #Announcement for function
-    #client = mqtt.Client(client_ID)  # create new instance
-    #print(publish_message)
-    publish.single(publish_topic, publish_message, 2, False, broker_fog_address, broker_fog_port)
+#deprecated for a now
+def publish_to_cloud_all():
+    print("pub")
 
 def func_sub_pub(thread_type):
     if (thread_type == "Subscribe_Fog"):
@@ -147,40 +236,40 @@ def func_sub_pub(thread_type):
 
         client.connect(broker_fog_address)  # connect to broker
 
-        client.subscribe(client_sub_topic_drone1)
-        client.subscribe(client_sub_topic_drone2)
+        client.subscribe(cli_to_fog_sub_top_d1_state)
+        client.subscribe(cli_to_fog_sub_top_d2_state)
         while (1):
             client.loop_start()  # start the loop
             # attach function to callback
             client.on_message = callback_on_message_fog
             client.loop_stop()  # stop the loop
 
-    if (thread_type == "Publish_Fog"):
-        print("This thread will publish drone state to FoG. \n ")
-        # start drone connection
-        #vehicle = connect_to_drone()
-        while (1):
-            publish_to_fog(client_pub_topic_state + "/location",
-                           "lat:" + "14.23" + " lon:" + "15.23" + " alt:" + "100")
-            publish_to_fog(client_pub_topic_state + "/battery", "50")
-            publish_to_fog(client_pub_topic_state + "/groundspeed", "20")
-            publish_to_fog(client_pub_topic_state + "/mode", "TAKEOFF")
-            publish_to_fog(client_pub_topic_state + "/heading", "200")
+    elif (thread_type == "Subscribe_Cloud"):
 
-    if(thread_type=="Subscribe_Fog"):
-        print("This client will wait for command. \n ")
-
+        print("This client will subscribe to Cloud broker. \n ")
         client = mqtt.Client(client_ID)  # create new instance
-        print("connecting to Fog")
+        print("connecting to Cloud")
 
-        client.connect(fog_broker_adress,fog_broker_port)  # connect to broker
-        client.subscribe(client_sub_topic_command)
+        client.connect(broker_fog_address)  # connect to broker
 
+        client.subscribe(cli_to_cloud_sub_top_connect)
+        client.subscribe(cli_to_cloud_sub_top_d1_cmd)
+        client.subscribe(cli_to_cloud_sub_top_d2_cmd)
         while (1):
             client.loop_start()  # start the loop
             # attach function to callback
-            client.on_message = callback_on_message
+            client.on_message = callback_on_message_cloud
             client.loop_stop()  # stop the loop
+
+    elif (thread_type == "Publish_Fog"):
+        print("This thread will publish messages to FoG. \n ")
+        while (1):
+            publish_to_fog_all()
+
+    elif(thread_type=="Publish_Cloud"):
+        print("This thread will publish messages to Cloud. \n ")
+        while (1):
+            publish_to_cloud_all()
 
 
 
@@ -206,18 +295,18 @@ def main():
 
     sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
     sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
-    pub_cloud_thread = sub_pub_thread(3, "Publish_Cloud")
-    pub_fog_thread = sub_pub_thread(4, "Publish_Fog")
+    #pub_cloud_thread = sub_pub_thread(3, "Publish_Cloud")
+    #pub_fog_thread = sub_pub_thread(4, "Publish_Fog")
 
     sub_cloud_thread.start()
     sub_fog_thread.start()
-    pub_cloud_thread.start()
-    pub_fog_thread.start()
+    #pub_cloud_thread.start()
+    #pub_fog_thread.start()
 
     sub_cloud_thread.join()
     sub_fog_thread.join()
-    pub_cloud_thread.join()
-    pub_fog_thread.join()
+    #pub_cloud_thread.join()
+    #pub_fog_thread.join()
 
 #endregion
 
