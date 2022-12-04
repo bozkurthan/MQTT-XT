@@ -1,38 +1,76 @@
-# -*- coding: utf-8 -*-
-
+# region imports
+from __future__ import print_function
 import threading
-
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
+import time
+#endregion
 
-# model girdilerini almak için 2D bir dizi oluşturulsu- dolu değerleri bu diziliere alınıp modele verielcek
 
-
-sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
-
-global sub_message
-
-# pragma CONFIG
+# region MQTT connection Variables
 client_ID = "activator_client"
 
-#adress definition
 broker_cloud_address = "test.mosquitto.org"
 broker_cloud_port = 1883
-broker_fog1_address = "192.168.1.41"
-broker_fog1_port = 1884
+broker_fog_address = "127.0.0.1"
+broker_fog_port = 1884
+fog_number="fog1"
+
+# endregion
 
 
+#region Topics
+
+#region Topics to Publish
+
+#topics pub to cloud
+
+#Connectivity
+client_pub_topic_drone1_reachability=fog_number+"/drone1/reachable"
+client_pub_topic_drone2_reachability=fog_number+"/drone2/reachable"
+
+#Drone states
+client_pub_topic_drone1_state=fog_number+"/drone1/state"
+client_pub_topic_drone2_state=fog_number+"/drone2/state"
+client_pub_topic_drone2_state=fog_number+"/qods/"
+
+#Command Results
+client_pub_topic_drone1_command_result=fog_number+"/drone1/state"
+client_pub_topic_drone2_state=fog_number+"/drone2/state"
+
+
+#topics pub to own server
+client_pub_topic_drone1_commands="drone1/commands"
+client_pub_topic_drone2_state="/drone2/commands"
+
+#endregion
+
+#region Topics to Subscribe
 
 #topics sub to fog broker
 client_sub_topic_drone1 = "drone1/state/#"
 client_sub_topic_drone2 = "drone2/state/#"
 
 #topics sub to cloud
-client_sub_topic_connection = "init/fog1"
 
-#topics pub to cloud
-client_pub_topic_drone1_state="fog1/drone1/state"
+#Connectivity
+client_sub_topic_connection = "init/" + fog_number
 
+#Connectivity
+client_sub_topic_drone1_commands = fog_number + "drone1/commands"
+client_sub_topic_drone2_commands = fog_number + "drone2/commands"
+
+#endregion
+
+#endregion
+
+
+# region Function definitions
+
+
+sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
+
+global sub_message
 
 cloud_connect=True
 
@@ -59,9 +97,11 @@ def process_reachability(sub_message):
 
     #publish.single(client_pub_topic_connection, "", 1, False, broker_cloud_address, broker_cloud_port)
 
-def callback_on_message(client, userdata, message):
+def callback_on_message_fog(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
+
+
     process_reachability(sub_message)
 
 
@@ -85,31 +125,56 @@ def client_pub ():
 
         print("Publish:", publish_message)
 
-def client_sub_pub(sub_type):
-    if (sub_type == "Subscribe_Broker"):
-        print("This client will subscribe to own broker. \n ")
 
-        client2 = mqtt.Client(client_ID)  # create new instance
+def publish_to_cloud(publish_topic,publish_message):
+    #Announcement for function
+    #client = mqtt.Client(client_ID)  # create new instance
+    #print(publish_message)
+    publish.single(publish_topic, publish_message, 2, False, broker_cloud_address, broker_cloud_port)
+
+def publish_to_fog(publish_topic,publish_message):
+    #Announcement for function
+    #client = mqtt.Client(client_ID)  # create new instance
+    #print(publish_message)
+    publish.single(publish_topic, publish_message, 2, False, broker_fog_address, broker_fog_port)
+
+def func_sub_pub(thread_type):
+    if (thread_type == "Subscribe_Fog"):
+
+        print("This client will subscribe to own broker. \n ")
+        client = mqtt.Client(client_ID)  # create new instance
         print("connecting to Broker")
 
-        client2.connect(broker_fog1_address)  # connect to broker
+        client.connect(broker_fog_address)  # connect to broker
 
-        client2.subscribe(client_sub_topic_drone1)
-        client2.subscribe(client_sub_topic_drone2)
+        client.subscribe(client_sub_topic_drone1)
+        client.subscribe(client_sub_topic_drone2)
         while (1):
-            client2.loop_start()  # start the loop
+            client.loop_start()  # start the loop
             # attach function to callback
-            client2.on_message = callback_on_message_cloud
-            client2.loop_stop()  # stop the loop
+            client.on_message = callback_on_message_fog
+            client.loop_stop()  # stop the loop
 
-    if(sub_type=="Subscribe_Cloud"):
-        print("This client will wait for connection signal. \n ")
+    if (thread_type == "Publish_Fog"):
+        print("This thread will publish drone state to FoG. \n ")
+        # start drone connection
+        #vehicle = connect_to_drone()
+        while (1):
+            publish_to_fog(client_pub_topic_state + "/location",
+                           "lat:" + "14.23" + " lon:" + "15.23" + " alt:" + "100")
+            publish_to_fog(client_pub_topic_state + "/battery", "50")
+            publish_to_fog(client_pub_topic_state + "/groundspeed", "20")
+            publish_to_fog(client_pub_topic_state + "/mode", "TAKEOFF")
+            publish_to_fog(client_pub_topic_state + "/heading", "200")
+
+    if(thread_type=="Subscribe_Fog"):
+        print("This client will wait for command. \n ")
 
         client = mqtt.Client(client_ID)  # create new instance
-        print("connecting to Cloud")
+        print("connecting to Fog")
 
-        client.connect(broker_cloud_address)  # connect to broker
-        client.subscribe(client_sub_topic_connection)
+        client.connect(fog_broker_adress,fog_broker_port)  # connect to broker
+        client.subscribe(client_sub_topic_command)
 
         while (1):
             client.loop_start()  # start the loop
@@ -119,37 +184,47 @@ def client_sub_pub(sub_type):
 
 
 
-class subscribe_thread (threading.Thread):
+class sub_pub_thread (threading.Thread):
    def __init__(self, threadID, name):
       threading.Thread.__init__(self)
       self.threadID = threadID
       self.name = name
    def run(self):
       print ("Starting " + self.name)
-      client_sub_pub(self.name)
+      func_sub_pub(self.name)
       print ("Exiting " + self.name)
 
-
-
-# Create new threads
-sub_cloud_thread = subscribe_thread(1, "Subscribe_Cloud")
-
-
-sub_broker_thread = subscribe_thread(2, "Subscribe_Broker")
-
-
-sub_broker_thread.start()
-sub_cloud_thread.start()
-
-sub_broker_thread.join()
-sub_cloud_thread.join()
-# Start new Threads
-
-
-print ("Exiting Main Thread")
+#endregion
 
 
 
+
+
+# region Main class
+
+def main():
+
+    sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
+    sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
+    pub_cloud_thread = sub_pub_thread(3, "Publish_Cloud")
+    pub_fog_thread = sub_pub_thread(4, "Publish_Fog")
+
+    sub_cloud_thread.start()
+    sub_fog_thread.start()
+    pub_cloud_thread.start()
+    pub_fog_thread.start()
+
+    sub_cloud_thread.join()
+    sub_fog_thread.join()
+    pub_cloud_thread.join()
+    pub_fog_thread.join()
+
+#endregion
+
+# region Code start
+if __name__ == '__main__':
+    main()
+# endregion
 
 
 

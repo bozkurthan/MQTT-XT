@@ -12,7 +12,7 @@ from numpy import long
 # model girdilerini almak için 2D bir dizi oluşturulsu- dolu değerleri bu diziliere alınıp modele verielcek
 
 
-sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
+#sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
 
 global sub_message
 
