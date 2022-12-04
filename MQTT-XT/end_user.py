@@ -1,42 +1,68 @@
 # -*- coding: utf-8 -*-
-
+#region imports
 import os
 import shutil
-import time
-
+import threading
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
 import psutil
-from numpy import long
-
-# model girdilerini almak için 2D bir dizi oluşturulsu- dolu değerleri bu diziliere alınıp modele verielcek
-
+#endregion
 
 #sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
 
-global sub_message
 
-# region CONFIG
+# region MQTT connection Variables
 client_ID = "end_user"
-
-test_packet_length = 5
 
 broker_cloud_address = "test.mosquitto.org" # bu clientta etki etmıyor
 broker_cloud_port = 1883
 
+#endregion
+
+
+#region Topics
+
+#region Topics to Publish
+
+#topics pub to cloud
+
+#Connectivity
+cli_pub_topic_connection = "init/"
+
+#Command
+cli_to_cloud_pub_top_d1_cmd="fog1/drone1/commands"
+cli_to_cloud_pub_top_d2_cmd="fog1/drone2/commands"
+cli_to_cloud_pub_top_fog_cmd="fog1/commands"
+
+#endregion
+
+#region Topics to Subscribe
+
+#Connectivity
+cli_to_cloud_sub_top_reach = "fog1/reachable"
+
+#Drone states
+cli_to_cloud_sub_top_d1_state = "fog1/drone1/state/#"
+cli_to_cloud_sub_top_d2_state = "fog1/drone2/state/#"
+cli_to_cloud_sub_top_qdos = "fog1/QDoS"
+
+#Command Results
+cli_to_cloud_sub_top_d1_cmd_result = "fog1/drone1/commands_result/#"
+cli_to_cloud_sub_top_d2_cmd_result = "fog1/drone2/commands_result/#"
+
+#endregion
+
+#endregion
+
 #topics
-client_sub_topic_reachable = "fog1/reachable"
-client_sub_topic_drone1_state_topic = "fog1/drone1/state/#"
-client_sub_topic_drone2_state_topic = "fog1/drone2/state/#"
-client_sub_topic_qdos_topic = "fog1/QDoS"
+
+
 
 fog1_list=[]
 drone1_reachability_changed=False
 drone2_reachability_changed=False
 
 cloud_connect=True
-
-client_pub_topic_connection = "init/fog1"
 
 
 publish_delay_time = 1
@@ -45,6 +71,8 @@ client_number = "FOG1"
 location_number = "L1"
 packet_name=location_number+ "-"+ client_number
 
+
+#region data log
 dir_name = "data_log1"
 log_dir = os.getcwd()
 log_dir = log_dir + "/" + dir_name
@@ -58,96 +86,114 @@ if os.path.isdir(log_dir):
 else:
     log_dir = log_dir + "/"
     os.mkdir(log_dir)
+#endregion
+
+# region Function definitions
+
+def process_sub_message_cloud(message,topic):
+    print("Cloud Topic:"+topic,",Message:"+message)
+
+    if(topic=="fog1/#"):
+    #sub to Connectivity
+        if(topic=="fog1/drone1/reachable"):
+            print("Reacheability of drone1:", message)
+        elif(topic=="fog1/drone2/reachable"):
+            print("Reacheability of drone2:", message)
+        #sub to drone states
+        elif (topic == "drone1/state/#"):
+            print(topic +":" +message)
+        elif (topic == "drone2/state/#"):
+            print(topic + ":" + message)
 
 
-
-def process_reachability(sub_message):
-    print("Sub message:", sub_message)
-    global drone1_reachability_changed
-    global drone2_reachability_changed
-
-    if(sub_message=="drone1/reachable" and drone1_reachability_changed==False):
-        fog1_list.append("drone1")
-        drone1_reachability_changed =True
-    elif(sub_message=="drone2/reachable" and drone2_reachability_changed==False):
-        fog1_list.append("drone2")
-        drone2_reachability_changed = True
-
-    if(sub_message=="drone1/unreachable" and drone1_reachability_changed==True):
-        fog1_list.remove("drone1")
-        drone1_reachability_changed =False
-    elif(sub_message=="drone2/unreachable" and drone2_reachability_changed==True):
-        fog1_list.remove("drone2")
-        drone2_reachability_changed = False
-
-    fog1_list.sort()
-    print(fog1_list)
-    # These code snippet provides that it handles time by incoming messages and saves them to file.
-    # After this operation, it prepares new message.
-    #start_time_for_message_log = long(time.time() * 1000)
-    #time_first, message_time = sub_message.split("[")
-    #message_time, unused = message_time.split("]")
-    #unused, time_last = sub_message.split("]")
-    #incoming_data_log_cfg_tx_time(time_first, message_time, sub_message.__sizeof__())
-    #write_cpu_mem_values()
-    #new_message = time_first + "[" + str(long(time.time() * 1000)) + "]" + time_last
-    #publish_message_log_time(time_first, start_time_for_message_log, new_message.__sizeof__())
-    #publish.single(client_pub_topic, new_message, 1, False, pub_broker_address, pub_broker_port)
-
-    #print("Publish NoNaN:", new_message)
-
-    publish.single(client_pub_topic_connection, "", 1, False, broker_cloud_address, broker_cloud_port)
-
-def callback_on_message(client, userdata, message):
+# message function that handle cloud messages
+def callback_on_message_cloud(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
-    process_reachability(sub_message)
+    topic = message.topic
+    process_sub_message_cloud(sub_message,topic)
 
 
-def client_sub_pub():
-    print("This client will be run for publishing and subscribing. \n ")
-
-    client = mqtt.Client(client_ID)  # create new instance
-    print("connecting to broker")
-
-    client.connect(broker_cloud_address)  # connect to broker
-
-    client.subscribe(client_sub_topic_reachable)
-    client.subscribe(client_sub_topic_drone1_state_topic)
-    client.subscribe(client_sub_topic_drone2_state_topic)
-    client.subscribe(client_sub_topic_qdos_topic)
-    while (1):
-        client.loop_start()  # start the loop
-        # attach function to callback
-        client.on_message = callback_on_message
-        client.loop_stop()  # stop the loop
-
-def client_pub (connection_type):
-    print("This client will be run for only publishing. \n ")
-    #client = mqtt.Client(client_ID)  # create new instance
-    global cloud_connect
-    global broker_cloud_address
-    global broker_cloud_port
-    global client_pub_topic_connection
-    print(cloud_connect)
-    publish_message=""
-    while (cloud_connect==True):
-        if(connection_type=="connect"):
-            print("connnectttt")
-            publish_message = "connect"
-            publish.single(client_pub_topic_connection, publish_message, 2, False, broker_cloud_address,
-                           broker_cloud_port)
-            client_sub_pub()
-        elif(connection_type=="disconnect"):
-            publish_message = "disconnect"
+def cloud_pub_connect_message(fog_number,connection_type):
 
 
-        print("Publish:", publish_message)
+    if(connection_type=="connect"):
+        print("This client connects %s, on cloud. \n " %fog_number)
+        publish_message = "connect"
+        publish.single(cli_pub_topic_connection+fog_number, publish_message, 2, False, broker_cloud_address,
+                       broker_cloud_port)
+    elif(connection_type=="disconnect"):
+        publish_message = "disconnect"
+
+
+    print("Publish:", publish_message)
+
+
+def publish_to_cloud_all():
+    print("pub")
+
+def func_sub_pub(thread_type):
+
+    if (thread_type == "Subscribe_Cloud"):
+
+        print("This client will subscribe to Cloud broker. \n ")
+        client = mqtt.Client(client_ID)  # create new instance
+        print("connecting to Cloud\n")
+
+        client.connect(broker_cloud_address,broker_cloud_port)  # connect to broker
+
+        client.subscribe(cli_to_cloud_sub_top_qdos)
+        client.subscribe(cli_to_cloud_sub_top_reach)
+        client.subscribe(cli_to_cloud_sub_top_d1_state)
+        client.subscribe(cli_to_cloud_sub_top_d2_state)
+        client.subscribe(cli_to_cloud_sub_top_d1_cmd_result)
+        client.subscribe(cli_to_cloud_sub_top_d2_cmd_result)
+        while (1):
+            client.loop_start()  # start the loop
+            # attach function to callback
+            client.on_message = callback_on_message_cloud
+            client.loop_stop()  # stop the loop
+
+    elif(thread_type=="Publish_Cloud"):
+        print("This thread will publish messages to Cloud. \n ")
+        while (1):
+            publish_to_cloud_all()
 
 
 
+class sub_pub_thread (threading.Thread):
+   def __init__(self, threadID, name):
+      threading.Thread.__init__(self)
+      self.threadID = threadID
+      self.name = name
+   def run(self):
+      print ("Starting " + self.name)
+      func_sub_pub(self.name)
+      print ("Exiting " + self.name)
+
+#endregion
 
 
-connection_type="connect"
-client_pub(connection_type)
+# region Main class
+
+def main():
+
+    cloud_pub_connect_message("fog1","connect")
+
+    sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
+    pub_cloud_thread = sub_pub_thread(2, "Publish_Cloud")
+
+    sub_cloud_thread.start()
+    #pub_cloud_thread.start()
+
+    sub_cloud_thread.join()
+    #pub_cloud_thread.join()
+
+
+#endregion
+
+# region Code start
+if __name__ == '__main__':
+    main()
+# endregion
 

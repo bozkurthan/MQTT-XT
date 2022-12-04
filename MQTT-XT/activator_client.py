@@ -116,23 +116,11 @@ def publish_to_cloud(publish_topic,publish_message):
 
 
 def process_sub_message_cloud(message,topic):
-    print("Cloud Topic:"+message,",Message:"+topic)
+    print("Cloud Topic:"+topic,",Message:"+message)
 
-    if(sub_message=="connect"):
-        print("Connect_message_received:", sub_message)
-    elif(sub_message != ""):
-        if (sub_message[0] == "L"):
-            print("Published LOcation: "+ sub_message)
-            publish.single(client_pub_topic_drone1_state+"/location", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
-        if (sub_message[0] == "B"):
-            print("Published LOcation: " + sub_message)
-            publish.single(client_pub_topic_drone1_state+"/battery", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
+    if(message=="connect"):
+        print("Connect_message_received:", message)
 
-        # These code snippet provides that it handles time by incoming messages and saves them to file.
-    # After this operation, it prepares new message.
-
-
-    #publish.single(client_pub_topic_connection, "", 1, False, broker_cloud_address, broker_cloud_port)
 
 #calculate qdos based on battery and groundspeed
 def qdos_calculate():
@@ -141,19 +129,19 @@ def qdos_calculate():
     global drone1_groundspeed
     global drone2_groundspeed
 
-    if(drone1_battery>drone2_battery):
+    if(int(drone1_battery)>int(drone2_battery)):
         publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
-    elif(drone1_battery<drone2_battery):
+    elif(int(drone1_battery)<int(drone2_battery)):
         publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone2,drone1")
-    elif(drone1_battery==drone2_battery):
-        if(drone1_groundspeed>drone2_groundspeed):
+    elif(int(drone1_battery)==int(drone2_battery)):
+        if(int(drone1_groundspeed)>int(drone2_groundspeed)):
             publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
         else:
             publish_to_cloud(cli_to_cloud_pub_top_qdos, "drone2,drone1")
 
 #process fog messages (this includes to publish state of drones, qdos values and drone reacheability
 def process_sub_message_fog(message,topic):
-    print("Fog Topic:"+message,",Message:"+topic)
+    print("Fog Topic:"+topic,",Message:"+message)
     global drone1_battery
     global drone2_battery
     global drone1_groundspeed
@@ -165,43 +153,44 @@ def process_sub_message_fog(message,topic):
 
         # region drone1 states
         if(topic=="drone1/state/location" or topic=="drone1/state/mode" or topic=="drone1/state/heading" ):
-            publish_to_cloud(fog_number+"/"+topic,sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            publish_to_cloud(fog_number+"/"+topic,message)
+            publish_to_cloud(cli_to_cloud_pub_top_d1_reach, "true")
         if(topic=="drone1/state/battery"):
-            publish_to_cloud(fog_number+"/"+topic,sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
-            drone1_battery=sub_message
+            publish_to_cloud(fog_number+"/"+topic,message)
+            publish_to_cloud(cli_to_cloud_pub_top_d1_reach, "true")
+            drone1_battery=message
             qdos_calculate()
         if (topic == "drone1/state/groundspeed"):
-            publish_to_cloud(fog_number + "/" + topic, sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
-            drone1_groundspeed = sub_message
+            publish_to_cloud(fog_number + "/" + topic, message)
+            publish_to_cloud(cli_to_cloud_pub_top_d1_reach, "true")
+            drone1_groundspeed = message
             qdos_calculate()
 
         #endregion
 
         #region drone2 states
         if(topic=="drone2/state/location" or topic=="drone2/state/mode" or topic=="drone2/state/heading" ):
-            publish_to_cloud(fog_number+"/"+topic,sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
+            publish_to_cloud(fog_number+"/"+topic,message)
+            publish_to_cloud(cli_to_cloud_pub_top_d2_reach, "true")
         if(topic=="drone2/state/battery"):
-            publish_to_cloud(fog_number+"/"+topic,sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
-            drone2_battery=sub_message
+            publish_to_cloud(fog_number+"/"+topic,message)
+            publish_to_cloud(cli_to_cloud_pub_top_d2_reach, "true")
+            drone2_battery=message
             qdos_calculate()
         if (topic == "drone2/state/groundspeed"):
-            publish_to_cloud(fog_number + "/" + topic, sub_message)
-            publish_to_cloud(fog_number + "/" + cli_to_cloud_pub_top_d1_reach, "true")
-            drone2_groundspeed = sub_message
+            publish_to_cloud(fog_number + "/" + topic, message)
+            publish_to_cloud(cli_to_cloud_pub_top_d2_reach, "true")
+            drone2_groundspeed = message
             qdos_calculate()
         #endregion
 
         #region command results
         if (topic == "drone1/commands_result"):
-            publish_to_cloud(fog_number + "/" + topic, sub_message)
+            publish_to_cloud(fog_number + "/" + topic, message)
         if (topic == "drone2/commands_result"):
-            publish_to_cloud(fog_number+"/"+topic,sub_message)
+            publish_to_cloud(fog_number+"/"+topic,message)
         #endregion
+
 
 # message function that handle fog messages
 def callback_on_message_fog(client, userdata, message):
@@ -215,7 +204,7 @@ def callback_on_message_cloud(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
     topic = message.topic
-    process_sub_message_fog(sub_message,topic)
+    process_sub_message_cloud(sub_message,topic)
 
 
 
@@ -230,11 +219,11 @@ def publish_to_cloud_all():
 def func_sub_pub(thread_type):
     if (thread_type == "Subscribe_Fog"):
 
-        print("This client will subscribe to own broker. \n ")
+        print("This client will subscribe to Fog broker. \n ")
         client = mqtt.Client(client_ID)  # create new instance
-        print("connecting to Broker")
+        print("connecting to Broker\n")
 
-        client.connect(broker_fog_address)  # connect to broker
+        client.connect(broker_fog_address,broker_fog_port)  # connect to broker
 
         client.subscribe(cli_to_fog_sub_top_d1_state)
         client.subscribe(cli_to_fog_sub_top_d2_state)
@@ -248,9 +237,9 @@ def func_sub_pub(thread_type):
 
         print("This client will subscribe to Cloud broker. \n ")
         client = mqtt.Client(client_ID)  # create new instance
-        print("connecting to Cloud")
+        print("connecting to Cloud\n")
 
-        client.connect(broker_fog_address)  # connect to broker
+        client.connect(broker_cloud_address,broker_cloud_port)  # connect to broker
 
         client.subscribe(cli_to_cloud_sub_top_connect)
         client.subscribe(cli_to_cloud_sub_top_d1_cmd)
