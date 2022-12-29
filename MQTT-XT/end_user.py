@@ -8,8 +8,6 @@ import paho.mqtt.publish as publish
 import psutil
 #endregion
 
-#sub_message_type = dict(get_reachability="0", get_info_drone="1", get_commanmd_result="2")
-
 
 # region MQTT connection Variables
 client_ID = "end_user"
@@ -53,8 +51,6 @@ cli_to_cloud_sub_top_d2_cmd_result = "fog1/drone2/commands_result/#"
 #endregion
 
 #endregion
-
-#topics
 
 
 
@@ -181,7 +177,7 @@ def main():
     cloud_pub_connect_message("fog1","connect")
 
     sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
-    pub_cloud_thread = sub_pub_thread(2, "Publish_Cloud")
+    #pub_cloud_thread = sub_pub_thread(2, "Publish_Cloud")
 
     sub_cloud_thread.start()
     #pub_cloud_thread.start()

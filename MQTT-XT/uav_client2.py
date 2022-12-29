@@ -1,10 +1,13 @@
 # region imports
 from __future__ import print_function
-from dronekit import connect, VehicleMode
+
+import math
 import threading
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
 import time
+import asyncio
+from mavsdk import System
 #endregion
 
 
@@ -14,8 +17,8 @@ global vehicle
 #endregion
 
 # region MQTT connection Variables
-client_ID = "uav_client1"
-fog_broker_adress = "192.168.1.42"  # bu clientta etki etmıyor
+client_ID = "uav_client2"
+fog_broker_adress = "192.168.1.45"  # bu clientta etki etmıyor
 fog_broker_port = 1884
 # endregion
 
@@ -23,11 +26,12 @@ fog_broker_port = 1884
 #region Topics
 
 #region Topics to Publish
-client_pub_topic_state = "drone1/state"
+client_pub_topic_state = "drone2/state"
+client_pub_topic_command_result= "drone2/commands_result"
 #endregion
 
 #region Topics to Subscribe
-client_sub_topic_command = "drone1/commands"
+client_sub_topic_command = "drone2/commands"
 #endregion
 #endregion
 
@@ -36,49 +40,134 @@ client_sub_topic_command = "drone1/commands"
 #Drone connection
 def connect_to_drone():
     print("\nConnecting to vehicle on: %s" % connection_string)
-    vehicle = connect(connection_string, wait_ready=True)
+    #vehicle = connect(connection_string, wait_ready=True)
 
     # wait for ready signal
-    vehicle.wait_ready('autopilot_version')
+    #vehicle.wait_ready('autopilot_version')
 
-    return vehicle
+    #return vehicle
 
 def publish_to_fog(publish_topic,publish_message):
     #Announcement for function
     #client = mqtt.Client(client_ID)  # create new instance
     #print(publish_message)
     publish.single(publish_topic, publish_message, 2, False, fog_broker_adress, fog_broker_port)
-    time.sleep(0.2)
+    time.sleep(0.1)
 
 
 def process(sub_message):
     print("Sub message:", sub_message)
-    if (sub_message[0] == "takeoff"):
-        print("helloWorld1: "+ sub_message)
-        #publish.single(client_pub_topic_drone1_state+"/location", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
-        vehicle.simple_takeoff("20")
-    if (sub_message[0] == "B"):
-        print("helloWorld2: " + sub_message)
-        #publish.single(client_pub_topic_drone1_state+"/battery", sub_message, 1, False, broker_cloud_address, broker_cloud_port)
+    if (sub_message == "takeoff"):
+        print("Takeoff command received.")
+        # try to start command
+        #TAKEOFF COMMAND
+        #if takeoff success
+        print("Takeoff success.")
+        publish_to_fog(client_pub_topic_command_result + "/takeoff", "Success")
+        #else
+        #print("Takeoff Failed.")
+        #publish_to_fog(client_pub_topic_command_result + "/takeoff", "Failed")
+        #vehicle.simple_takeoff("20")
+    elif (sub_message == "land"):
+        print("Land command received.")
+        # try to start command
+        #LAND COMMAND
+        #if land success
+        print("Land success.")
+        publish_to_fog(client_pub_topic_command_result + "/land", "Success")
+        #else
+        #print("Land Failed.")
+        #publish_to_fog(client_pub_topic_command_result + "/land", "Failed")
+    elif (sub_message == "goto"):
+        print("Goto command received.")
+        # try to start command
+        #GOTO COMMAND
+        #if goto success
+        print("GoTo success.")
+        publish_to_fog(client_pub_topic_command_result + "/goto", "Success")
+        #else
+        #print("Goto Failed.")
+        #publish_to_fog(client_pub_topic_command_result + "/goto", "Failed")
+    elif (sub_message == "mode_change"):
+        print("Mode change command received.")
+        # try to start command
+        #MODE CHANGE COMMAND
+        #if change success
+        print("Mode Change success.")
+        publish_to_fog(client_pub_topic_command_result + "/mode_change", "Success")
+        #else
+        #print("Mode Change Failed.")
+        #publish_to_fog(client_pub_topic_command_result + "/mode_change", "Failed")
+    elif (sub_message == "mission"):
+        print("Mission command received.")
+        # try to start command
+        #MISSION COMMAND
+        #if mission success
+        print("Mission start success.")
+        publish_to_fog(client_pub_topic_command_result + "/mission", "Success")
+        #else
+        #print("Mission start Failed.")
+        #publish_to_fog(client_pub_topic_command_result + "/mission", "Failed")
+    else:
+        print("Unknown command received.")
+        # try to start command
+        publish_to_fog(client_pub_topic_command_result + "/"+sub_message, "Unknown")
 
 def callback_on_message(client, userdata, message):
     # print("message received ", str(message.payload.decode("utf-8")))
     sub_message = str(message.payload.decode("utf-8"))
     process(sub_message)
 
+async def print_battery(drone):
+    async for battery in drone.telemetry.battery():
+        battery = str(battery.remaining_percent)
+        publish_to_fog(client_pub_topic_state + "/battery", battery)
+
+        await asyncio.sleep(1)
+
+
+async def print_gs_info(drone):
+    async for velocity in drone.telemetry.velocity_ned():
+        speed = math.sqrt(velocity.east_m_s * velocity.east_m_s + velocity.north_m_s * velocity.north_m_s)
+        publish_to_fog(client_pub_topic_state + "/groundspeed", speed)
+        await asyncio.sleep(1)
+
+
+async def print_in_air(drone):
+    async for in_air in drone.telemetry.in_air():
+        print(f"In air: {in_air}")
+        await asyncio.sleep(1)
+
+
+async def print_position(drone):
+    async for position in drone.telemetry.position():
+        print(position)
+        await asyncio.sleep(1)
+
+
+async def run():
+    # Init the drone
+    drone = System()
+    await drone.connect(system_address="udp://:14540")
+    # Start the tasks
+    asyncio.ensure_future(print_battery(drone))
+    asyncio.ensure_future(print_gs_info(drone))
+    asyncio.ensure_future(print_in_air(drone))
+    asyncio.ensure_future(print_position(drone))
+
 def func_sub_pub(thread_type):
     if (thread_type == "Publish_Fog"):
         print("This thread will publish drone state to FoG. \n ")
-        # start drone connection
-        vehicle = connect_to_drone()
-        while (1):
-            publish_to_fog(client_pub_topic_state + "/location",
-                           "lat:" + str(vehicle.location.global_frame.lat) + " lon:" + str(
-                               vehicle.location.global_frame.lon) + " alt:" + str(vehicle.location.global_frame.alt))
-            publish_to_fog(client_pub_topic_state + "/battery", str(vehicle.battery.level))
-            publish_to_fog(client_pub_topic_state + "/groundspeed", str(vehicle.groundspeed))
-            publish_to_fog(client_pub_topic_state + "/mode", str(vehicle.mode.name))
-            publish_to_fog(client_pub_topic_state + "/heading", str(vehicle.heading))
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.create_task(run())
+            loop.run_forever()
+        finally:
+            loop.stop()
+            loop.close()
+
+
 
     if(thread_type=="Subscribe_Fog"):
         print("This client will wait for command. \n ")
@@ -105,8 +194,10 @@ class sub_pub_thread (threading.Thread):
       func_sub_pub(self.name)
       print ("Exiting " + self.name)
 
+#endregion
 
-########## MAIN CLASS
+# region Main class
+
 def main():
 
     pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
@@ -130,66 +221,6 @@ def main():
 if __name__ == '__main__':
     main()
 # endregion
-
-
-
-
-
-# pragma Vehicle attributes to receive
-# Get all vehicle attributes (state)
-
-# print(" Global Location: %s" % vehicle.location.global_frame)s
-# print(" Battery: %s" % vehicle.battery)
-# print(" Mode: %s" % vehicle.mode.name)  # settable
-# print(" Groundspeed: %s" % vehicle.groundspeed)
-# print(" System status: %s" % vehicle.system_status.state)
-# print(" Heading: %s" % vehicle.heading)
-# print(" Armed: %s" % vehicle.armed)  # settable
-# print(" Is Armable?: %s" % vehicle.is_armable)
-# print(" Attitude: %s" % vehicle.attitude)
-
-
-
-
-# Get Vehicle Home location - will be `None` until first set by autopilot
-# while not vehicle.home_location:
-#    cmds = vehicle.commands
-#    cmds.download()
-#    cmds.wait_ready()
-#    if not vehicle.home_location:
-#        print(" Waiting for home location ...")
-# We have a home location, so print it!
-# print("\n Home location: %s" % vehicle.home_location)
-
-# Set vehicle home_location, mode, and armed attributes (the only settable attributes)
-
-# print("\nSet new home location")
-# Home location must be within 50km of EKF home location (or setting will fail silently)
-# In this case, just set value to current location with an easily recognisable altitude (222)
-# my_location_alt = vehicle.location.global_frame
-# my_location_alt.alt = 222.0
-# vehicle.home_location = my_location_alt
-# print(" New Home Location (from attribute - altitude should be 222): %s" % vehicle.home_location)
-
-# Confirm current value on vehicle by re-downloading commands
-# cmds = vehicle.commands
-# cmds.download()
-# cmds.wait_ready()
-# print(" New Home Location (from vehicle - altitude should be 222): %s" % vehicle.home_location)
-
-# print("\nSet Vehicle.mode = GUIDED (currently: %s)" % vehicle.mode.name)
-# vehicle.mode = VehicleMode("GUIDED")
-
-# Check that vehicle is armable
-# while not vehicle.is_armable:
-#    print(" Waiting for vehicle to initialise...")
-#    time.sleep(1)
-
-
-## Reset variables to sensible values.
-# print("\nReset vehicle attributes/parameters and exit")
-# vehicle.mode = VehicleMode("STABILIZE")
-# vehicle.armed = False
 
 
 

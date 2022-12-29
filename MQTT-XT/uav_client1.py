@@ -14,7 +14,7 @@ global vehicle
 
 # region MQTT connection Variables
 client_ID = "uav_client1"
-fog_broker_adress = "127.0.0.1"  # bu clientta etki etmıyor
+fog_broker_adress = "192.168.1.45"  # bu clientta etki etmıyor
 fog_broker_port = 1884
 # endregion
 
@@ -48,7 +48,7 @@ def publish_to_fog(publish_topic,publish_message):
     #client = mqtt.Client(client_ID)  # create new instance
     #print(publish_message)
     publish.single(publish_topic, publish_message, 2, False, fog_broker_adress, fog_broker_port)
-    #time.sleep(0.2)
+    time.sleep(0.2)
 
 
 def process(sub_message):
@@ -126,7 +126,6 @@ def func_sub_pub(thread_type):
             publish_to_fog(client_pub_topic_state + "/groundspeed", "20")
             publish_to_fog(client_pub_topic_state + "/mode", "TAKEOFF")
             publish_to_fog(client_pub_topic_state + "/heading", "200")
-            print("why so slow")
 
     if(thread_type=="Subscribe_Fog"):
         print("This client will wait for command. \n ")
@@ -160,7 +159,6 @@ class sub_pub_thread (threading.Thread):
 def main():
 
     pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
-
     sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
 
     pub_fog_thread.start()

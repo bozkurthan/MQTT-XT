@@ -12,7 +12,7 @@ client_ID = "activator_client"
 
 broker_cloud_address = "test.mosquitto.org"
 broker_cloud_port = 1883
-broker_fog_address = "127.0.0.1"
+broker_fog_address = "192.168.1.45"
 broker_fog_port = 1884
 fog_number="fog1"
 
@@ -129,12 +129,12 @@ def qdos_calculate():
     global drone1_groundspeed
     global drone2_groundspeed
 
-    if(int(drone1_battery)>int(drone2_battery)):
+    if(float(drone1_battery)>float(drone2_battery)):
         publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
-    elif(int(drone1_battery)<int(drone2_battery)):
+    elif(float(drone1_battery)<float(drone2_battery)):
         publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone2,drone1")
-    elif(int(drone1_battery)==int(drone2_battery)):
-        if(int(drone1_groundspeed)>int(drone2_groundspeed)):
+    elif(float(drone1_battery)==float(drone2_battery)):
+        if(float(drone1_groundspeed)>float(drone2_groundspeed)):
             publish_to_cloud(cli_to_cloud_pub_top_qdos,"drone1,drone2")
         else:
             publish_to_cloud(cli_to_cloud_pub_top_qdos, "drone2,drone1")
@@ -273,9 +273,6 @@ class sub_pub_thread (threading.Thread):
       print ("Exiting " + self.name)
 
 #endregion
-
-
-
 
 
 # region Main class

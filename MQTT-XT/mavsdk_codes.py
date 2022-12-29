@@ -1,49 +1,54 @@
-#!/usr/bin/env python3
 
 import asyncio
 from mavsdk import System
-
+import datetime
+i=0
 
 async def run():
     # Init the drone
     drone = System()
-    await drone.connect(system_address="udp://:14540")
+    await drone.connect(system_address="udp://:14700")
 
     # Start the tasks
+    now = datetime.datetime.utcnow()
+    now_local = datetime.datetime.now()
+    print(now_local)
     asyncio.ensure_future(print_battery(drone))
-    asyncio.ensure_future(print_gps_info(drone))
-    asyncio.ensure_future(print_in_air(drone))
-    asyncio.ensure_future(print_position(drone))
 
 async def print_battery(drone):
     async for battery in drone.telemetry.battery():
         print(f"Battery: {battery.remaining_percent}")
-        await asyncio.sleep(0.2)
+        global i
+        await asyncio.sleep(1)
+        i+=1
+        print("bat " + str(i) + " seq")
+        if i == 99:
+            now = datetime.datetime.utcnow()
+            now_local = datetime.datetime.now()
+            print(now_local)
 
 
 async def print_gps_info(drone):
     async for gps_info in drone.telemetry.gps_info():
         print(f"GPS info: {gps_info}")
-        await asyncio.sleep(0.2)
 
 
 async def print_in_air(drone):
     async for in_air in drone.telemetry.in_air():
         print(f"In air: {in_air}")
-        await asyncio.sleep(0.2)
 
 
 async def print_position(drone):
-        print(drone.telemetry.position())
-        await asyncio.sleep(0.2)
+    async for position in drone.telemetry.position():
+        print(position)
 
 
 if __name__ == "__main__":
     # Start the main function
-    loop = asyncio.get_event_loop()
-    try:
-        loop.create_task(run())
-        loop.run_forever()
-    finally:
-        loop.stop()
-        loop.close()
+    asyncio.ensure_future(run())
+
+    # Runs the event loop until the program is canceled with e.g. CTRL-C
+    asyncio.get_event_loop().run_forever()
+
+
+
