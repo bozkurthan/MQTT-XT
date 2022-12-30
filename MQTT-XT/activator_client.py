@@ -10,9 +10,9 @@ import time
 # region MQTT connection Variables
 client_ID = "activator_client"
 
-broker_cloud_address = "test.mosquitto.org"
+broker_cloud_address = "127.0.0.1"
 broker_cloud_port = 1883
-broker_fog_address = "192.168.1.45"
+broker_fog_address = "127.0.0.1"
 broker_fog_port = 1884
 fog_number="fog1"
 
@@ -57,8 +57,8 @@ cli_to_fog_sub_top_d2_state = "drone2/state/#"
 cli_to_cloud_sub_top_connect = "init/" + fog_number
 
 #Commands
-cli_to_cloud_sub_top_d1_cmd = fog_number + "drone1/commands"
-cli_to_cloud_sub_top_d2_cmd = fog_number + "drone2/commands"
+cli_to_cloud_sub_top_d1_cmd = fog_number + "/drone1/commands"
+cli_to_cloud_sub_top_d2_cmd = fog_number + "/drone2/commands"
 
 #endregion
 
@@ -120,6 +120,8 @@ def process_sub_message_cloud(message,topic):
 
     if(message=="connect"):
         print("Connect_message_received:", message)
+    if(topic==cli_to_cloud_sub_top_d1_cmd):
+        publish_to_fog(cli_to_fog_pub_top_d1_cmd,message)
 
 
 #calculate qdos based on battery and groundspeed
@@ -279,17 +281,17 @@ class sub_pub_thread (threading.Thread):
 
 def main():
 
-    sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
+    #sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
     sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
     #pub_cloud_thread = sub_pub_thread(3, "Publish_Cloud")
     #pub_fog_thread = sub_pub_thread(4, "Publish_Fog")
 
-    sub_cloud_thread.start()
+    #sub_cloud_thread.start()
     sub_fog_thread.start()
     #pub_cloud_thread.start()
     #pub_fog_thread.start()
 
-    sub_cloud_thread.join()
+    #sub_cloud_thread.join()
     sub_fog_thread.join()
     #pub_cloud_thread.join()
     #pub_fog_thread.join()

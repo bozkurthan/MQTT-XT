@@ -3,8 +3,11 @@
 import os
 import shutil
 import threading
+import time
+
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
+import datetime
 import psutil
 #endregion
 
@@ -12,7 +15,7 @@ import psutil
 # region MQTT connection Variables
 client_ID = "end_user"
 
-broker_cloud_address = "test.mosquitto.org" # bu clientta etki etmıyor
+broker_cloud_address = "127.0.0.1" # bu clientta etki etmıyor
 broker_cloud_port = 1883
 
 #endregion
@@ -96,10 +99,14 @@ def process_sub_message_cloud(message,topic):
         elif(topic=="fog1/drone2/reachable"):
             print("Reacheability of drone2:", message)
         #sub to drone states
-        elif (topic == "drone1/state/#"):
+        elif (topic == "fog1/drone1/state/#"):
             print(topic +":" +message)
-        elif (topic == "drone2/state/#"):
+            now_local = datetime.datetime.now()
+            print(now_local)
+        elif (topic == "fog1/drone2/state/#"):
             print(topic + ":" + message)
+            now_local = datetime.datetime.now()
+            print(now_local)
 
 
 # message function that handle cloud messages
@@ -156,6 +163,8 @@ def func_sub_pub(thread_type):
             publish_to_cloud_all()
 
 
+def publish_to_cloud(publish_topic,publish_message):
+    publish.single(publish_topic, publish_message, 2, False, broker_cloud_address, broker_cloud_port)
 
 class sub_pub_thread (threading.Thread):
    def __init__(self, threadID, name):
@@ -176,6 +185,11 @@ def main():
 
     cloud_pub_connect_message("fog1","connect")
 
+
+
+    now = datetime.datetime.utcnow()
+    now_local = datetime.datetime.now()
+    print(now_local)
     sub_cloud_thread = sub_pub_thread(1, "Subscribe_Cloud")
     #pub_cloud_thread = sub_pub_thread(2, "Publish_Cloud")
 

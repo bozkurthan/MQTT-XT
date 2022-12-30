@@ -1,9 +1,13 @@
 # region imports
 from __future__ import print_function
+
+import math
 import threading
 import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
 import time
+import asyncio
+from mavsdk import System
 #endregion
 
 
@@ -13,7 +17,7 @@ global vehicle
 #endregion
 
 # region MQTT connection Variables
-client_ID = "uav_client1"
+client_ID = "uav_client2"
 fog_broker_adress = "192.168.1.45"  # bu clientta etki etmıyor
 fog_broker_port = 1884
 # endregion
@@ -22,12 +26,12 @@ fog_broker_port = 1884
 #region Topics
 
 #region Topics to Publish
-client_pub_topic_state = "drone1/state"
-client_pub_topic_command_result= "drone1/commands_result"
+client_pub_topic_state = "drone2/state"
+client_pub_topic_command_result= "drone2/commands_result"
 #endregion
 
 #region Topics to Subscribe
-client_sub_topic_command = "drone1/commands"
+client_sub_topic_command = "drone2/commands"
 #endregion
 #endregion
 
@@ -48,7 +52,7 @@ def publish_to_fog(publish_topic,publish_message):
     #client = mqtt.Client(client_ID)  # create new instance
     #print(publish_message)
     publish.single(publish_topic, publish_message, 2, False, fog_broker_adress, fog_broker_port)
-    time.sleep(0.2)
+    time.sleep(0.1)
 
 
 def process(sub_message):
@@ -114,18 +118,56 @@ def callback_on_message(client, userdata, message):
     sub_message = str(message.payload.decode("utf-8"))
     process(sub_message)
 
+async def print_battery(drone):
+    async for battery in drone.telemetry.battery():
+        battery = str(battery.remaining_percent)
+        publish_to_fog(client_pub_topic_state + "/battery", battery)
+
+        await asyncio.sleep(1)
+
+
+async def print_gs_info(drone):
+    async for velocity in drone.telemetry.velocity_ned():
+        speed = math.sqrt(velocity.east_m_s * velocity.east_m_s + velocity.north_m_s * velocity.north_m_s)
+        publish_to_fog(client_pub_topic_state + "/groundspeed", speed)
+        await asyncio.sleep(1)
+
+
+async def print_in_air(drone):
+    async for in_air in drone.telemetry.in_air():
+        print(f"In air: {in_air}")
+        await asyncio.sleep(1)
+
+
+async def print_position(drone):
+    async for position in drone.telemetry.position():
+        print(position)
+        await asyncio.sleep(1)
+
+
+async def run():
+    # Init the drone
+    drone = System()
+    await drone.connect(system_address="udp://:14540")
+    # Start the tasks
+    asyncio.ensure_future(print_battery(drone))
+    asyncio.ensure_future(print_gs_info(drone))
+    asyncio.ensure_future(print_in_air(drone))
+    asyncio.ensure_future(print_position(drone))
+
 def func_sub_pub(thread_type):
     if (thread_type == "Publish_Fog"):
         print("This thread will publish drone state to FoG. \n ")
-        # start drone connection
-        #vehicle = connect_to_drone()
-        while (1):
-            publish_to_fog(client_pub_topic_state + "/location",
-                           "lat:" + "14.23" + " lon:" + "15.23" + " alt:" + "100")
-            publish_to_fog(client_pub_topic_state + "/battery", "50")
-            publish_to_fog(client_pub_topic_state + "/groundspeed", "20")
-            publish_to_fog(client_pub_topic_state + "/mode", "TAKEOFF")
-            publish_to_fog(client_pub_topic_state + "/heading", "200")
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.create_task(run())
+            loop.run_forever()
+        finally:
+            loop.stop()
+            loop.close()
+
+
 
     if(thread_type=="Subscribe_Fog"):
         print("This client will wait for command. \n ")
@@ -159,6 +201,7 @@ class sub_pub_thread (threading.Thread):
 def main():
 
     pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
+
     sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
 
     pub_fog_thread.start()
