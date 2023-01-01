@@ -17,21 +17,21 @@ global vehicle
 #endregion
 
 # region MQTT connection Variables
-client_ID = "uav_client2"
+client_ID = "uav_clientz"
 fog_broker_adress = "192.168.1.45"  # bu clientta etki etmıyor
-fog_broker_port = 1884
+fog_broker_port = 1883
 # endregion
 
 
 #region Topics
 
 #region Topics to Publish
-client_pub_topic_state = "drone2/state"
-client_pub_topic_command_result= "drone2/commands_result"
+client_pub_topic_state = "drone3/state"
+client_pub_topic_command_result= "drone3/commands_result"
 #endregion
 
 #region Topics to Subscribe
-client_sub_topic_command = "drone2/commands"
+client_sub_topic_command = "drone3/commands"
 #endregion
 #endregion
 
@@ -88,23 +88,23 @@ def process(sub_message):
         #else
         #print("Goto Failed.")
         #publish_to_fog(client_pub_topic_command_result + "/goto", "Failed")
-    elif (sub_message == "mode_change"):
-        print("Mode change command received.")
+    elif (sub_message == "offboard,70"):
+        print("offboard,70 command received.")
         # try to start command
         #MODE CHANGE COMMAND
         #if change success
-        print("Mode Change success.")
+        print("Offboard Change success.")
         publish_to_fog(client_pub_topic_command_result + "/mode_change", "Success")
         #else
         #print("Mode Change Failed.")
         #publish_to_fog(client_pub_topic_command_result + "/mode_change", "Failed")
-    elif (sub_message == "mission"):
-        print("Mission command received.")
+    elif (sub_message == "arm"):
+        print("Arm command received.")
         # try to start command
         #MISSION COMMAND
         #if mission success
-        print("Mission start success.")
-        publish_to_fog(client_pub_topic_command_result + "/mission", "Success")
+        print("Arm start success.")
+        publish_to_fog(client_pub_topic_command_result + "/arm", "Success")
         #else
         #print("Mission start Failed.")
         #publish_to_fog(client_pub_topic_command_result + "/mission", "Failed")
@@ -120,40 +120,49 @@ def callback_on_message(client, userdata, message):
 
 async def print_battery(drone):
     async for battery in drone.telemetry.battery():
-        battery = str(battery.remaining_percent)
-        publish_to_fog(client_pub_topic_state + "/battery", battery)
-
+        #print(f"Battery: {battery.remaining_percent}")
+        publish_to_fog(client_pub_topic_state + "/battery", str(battery.remaining_percent))
         await asyncio.sleep(1)
 
 
 async def print_gs_info(drone):
     async for velocity in drone.telemetry.velocity_ned():
         speed = math.sqrt(velocity.east_m_s * velocity.east_m_s + velocity.north_m_s * velocity.north_m_s)
-        publish_to_fog(client_pub_topic_state + "/groundspeed", speed)
+        #print(f"GS info:"+ str(speed))
+        publish_to_fog(client_pub_topic_state + "/groundspeed", str(speed))
         await asyncio.sleep(1)
 
+async def print_heading_info(drone):
+    async for heading in drone.telemetry.raw_gps():
+        gps_heading = heading.heading_uncertainty_deg
+        #print(f"heading {gps_heading}")
+        publish_to_fog(client_pub_topic_state + "/heading", str(gps_heading))
+        await asyncio.sleep(1)
 
-async def print_in_air(drone):
-    async for in_air in drone.telemetry.in_air():
-        print(f"In air: {in_air}")
+async def print_flightmode_info(drone):
+    async for flight_mode in drone.telemetry.flight_mode():
+        #print("FlightMode:", flight_mode)
+        publish_to_fog(client_pub_topic_state + "/mode", str(flight_mode))
         await asyncio.sleep(1)
 
 
 async def print_position(drone):
     async for position in drone.telemetry.position():
-        print(position)
+        #print(position)
+        publish_to_fog(client_pub_topic_state + "/location", str(position))
         await asyncio.sleep(1)
 
 
 async def run():
     # Init the drone
     drone = System()
-    await drone.connect(system_address="udp://:14540")
+    await drone.connect(system_address="udp://:14542")
     # Start the tasks
     asyncio.ensure_future(print_battery(drone))
-    asyncio.ensure_future(print_gs_info(drone))
-    asyncio.ensure_future(print_in_air(drone))
     asyncio.ensure_future(print_position(drone))
+    asyncio.ensure_future(print_flightmode_info(drone))
+    asyncio.ensure_future(print_gs_info(drone))
+    asyncio.ensure_future(print_heading_info(drone))
 
 def func_sub_pub(thread_type):
     if (thread_type == "Publish_Fog"):
@@ -201,7 +210,6 @@ class sub_pub_thread (threading.Thread):
 def main():
 
     pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
-
     sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
 
     pub_fog_thread.start()
