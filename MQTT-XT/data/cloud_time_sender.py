@@ -16,7 +16,7 @@ def publish_to_fog(publish_topic,publish_message):
     publish.single(publish_topic, publish_message, 2, False, broker_cloud_address, broker_cloud_port)
 
 i=0
-while i<1000:
+while i<2000:
     now = datetime.datetime.utcnow()
     #now_local = datetime.datetime.now()
     #print(now_local)

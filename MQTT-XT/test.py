@@ -7,11 +7,10 @@ import paho.mqtt.client as mqtt  # import the client1
 import paho.mqtt.publish as publish
 import time
 import asyncio
-import datetime
 from mavsdk import System
 #endregion
 
-i=0
+
 # region UAV variables to connect
 connection_string = "127.0.0.1:14550"
 global vehicle
@@ -20,7 +19,7 @@ global vehicle
 # region MQTT connection Variables
 client_ID = "uav_client1"
 fog_broker_adress = "127.0.0.1"  # bu clientta etki etmıyor
-fog_broker_port = 1884
+fog_broker_port = 1883
 # endregion
 
 
@@ -121,92 +120,40 @@ def callback_on_message(client, userdata, message):
 
 async def print_battery(drone):
     async for battery in drone.telemetry.battery():
-        print(f"Battery: {battery.remaining_percent}")
-        global i
+        battery = str(battery.remaining_percent)
+        publish_to_fog(client_pub_topic_state + "/battery", battery)
+
         await asyncio.sleep(1)
-        publish_to_fog(client_pub_topic_state+"/battery",str(battery.remaining_percent))
-        i+=1
-        print("bat " + str(i) + " seq")
-        if i == 99:
-            now = datetime.datetime.utcnow()
-            now_local = datetime.datetime.now()
-            print(now_local)
-            await asyncio.sleep(50)
 
 
 async def print_gs_info(drone):
     async for velocity in drone.telemetry.velocity_ned():
         speed = math.sqrt(velocity.east_m_s * velocity.east_m_s + velocity.north_m_s * velocity.north_m_s)
-        print(f"GS info:"+ str(speed))
-        publish_to_fog(client_pub_topic_state + "/groundspeed", str(speed))
-        global i
+        publish_to_fog(client_pub_topic_state + "/groundspeed", speed)
         await asyncio.sleep(1)
-        i+=1
-        print("gs " + str(i) + " seq")
-        if i == 99:
-            now = datetime.datetime.utcnow()
-            now_local = datetime.datetime.now()
-            print(now_local)
-            await asyncio.sleep(50)
-
-async def print_heading_info(drone):
-    async for heading in drone.telemetry.raw_gps():
-        gps_heading = heading.heading_uncertainty_deg
-        print(f"heading {gps_heading}")
-        publish_to_fog(client_pub_topic_state + "/heading", str(gps_heading))
-        global i
-        await asyncio.sleep(1)
-        i+=1
-        print("heading " + str(i) + " seq")
-        if i == 99:
-            now = datetime.datetime.utcnow()
-            now_local = datetime.datetime.now()
-            print(now_local)
-            await asyncio.sleep(50)
 
 
-async def print_flightmode_info(drone):
-    async for flight_mode in drone.telemetry.flight_mode():
-        print("FlightMode:", flight_mode)
-        publish_to_fog(client_pub_topic_state + "/mode", str(flight_mode))
-        global i
+async def print_in_air(drone):
+    async for in_air in drone.telemetry.in_air():
+        print(f"In air: {in_air}")
         await asyncio.sleep(1)
-        i+=1
-        print("bat " + str(i) + " seq")
-        if i == 99:
-            now = datetime.datetime.utcnow()
-            now_local = datetime.datetime.now()
-            print(now_local)
-            await asyncio.sleep(50)
 
 
 async def print_position(drone):
     async for position in drone.telemetry.position():
         print(position)
-        publish_to_fog(client_pub_topic_state + "/location", str(position))
-        global i
         await asyncio.sleep(1)
-        i+=1
-        print("pos " + str(i) + " seq")
-        if i == 99:
-            now = datetime.datetime.utcnow()
-            now_local = datetime.datetime.now()
-            print(now_local)
-            await asyncio.sleep(50)
+
 
 async def run():
     # Init the drone
     drone = System()
-    print("hancp")
     await drone.connect(system_address="udp://:14540")
     # Start the tasks
-    time.sleep(10)
-    now = datetime.datetime.utcnow()
-    now_local = datetime.datetime.now()
+    asyncio.ensure_future(print_battery(drone))
     asyncio.ensure_future(print_gs_info(drone))
-    #asyncio.ensure_future(print_gs_info(drone))
-    #asyncio.ensure_future(print_in_air(drone))
-    #asyncio.ensure_future(print_position(drone))
+    asyncio.ensure_future(print_in_air(drone))
+    asyncio.ensure_future(print_position(drone))
 
 def func_sub_pub(thread_type):
     if (thread_type == "Publish_Fog"):
@@ -253,15 +200,15 @@ class sub_pub_thread (threading.Thread):
 
 def main():
 
-    pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
+    #pub_fog_thread = sub_pub_thread(1, "Publish_Fog")
 
-    #sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
+    sub_fog_thread = sub_pub_thread(2, "Subscribe_Fog")
 
-    pub_fog_thread.start()
-    #sub_fog_thread.start()
+    #pub_fog_thread.start()
+    sub_fog_thread.start()
 
-    pub_fog_thread.join()
-    #sub_fog_thread.join()
+    #pub_fog_thread.join()
+    sub_fog_thread.join()
 
 
     # Close vehicle object before exiting script

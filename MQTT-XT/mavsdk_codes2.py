@@ -25,21 +25,11 @@ async def run():
         absolute_altitude = terrain_info.absolute_altitude_m
         break
 
-    print("-- Arming")
-    await drone.action.arm()
 
-    print("-- Taking off")
-    await drone.action.takeoff()
-
-    await asyncio.sleep(1)
     # To fly drone 20m above the ground plane
     flying_alt = absolute_altitude + 10.0
     # goto_location() takes Absolute MSL altitude
-    await drone.action.goto_location(47.3993677, 8.5469352, flying_alt, 0)
 
-    while True:
-        print("Staying connected, press Ctrl-C to exit")
-        await asyncio.sleep(1)
 
     await drone.action.goto_location(47.3977424, 8.5455928, flying_alt, 0)
 

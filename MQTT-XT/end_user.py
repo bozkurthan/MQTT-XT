@@ -99,11 +99,11 @@ def process_sub_message_cloud(message,topic):
         elif(topic=="fog1/drone2/reachable"):
             print("Reacheability of drone2:", message)
         #sub to drone states
-        elif (topic == "fog1/drone1/state/#"):
+        elif (topic == "drone1/state/#"):
             print(topic +":" +message)
             now_local = datetime.datetime.now()
             print(now_local)
-        elif (topic == "fog1/drone2/state/#"):
+        elif (topic == "drone2/state/#"):
             print(topic + ":" + message)
             now_local = datetime.datetime.now()
             print(now_local)
@@ -185,7 +185,16 @@ def main():
 
     cloud_pub_connect_message("fog1","connect")
 
+    now = datetime.datetime.utcnow()
+    now_local = datetime.datetime.now()
+    print(now_local)
+    i=0
+    while i<100:
 
+        time.sleep(1)
+        i += 1
+        publish_to_cloud(cli_to_cloud_pub_top_d1_cmd,"offboard,70")
+        print("offboard,70 " + str(i) + " seq")
 
     now = datetime.datetime.utcnow()
     now_local = datetime.datetime.now()
